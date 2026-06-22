@@ -22,7 +22,7 @@ function Authenticated() {
 
 function FullScreenMessage({ text }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-100 text-sm text-slate-500">
+    <div className="flex min-h-screen items-center justify-center bg-stone-100 text-sm text-slate-500 dark:bg-slate-900 dark:text-slate-400">
       {text}
     </div>
   );

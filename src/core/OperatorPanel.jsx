@@ -7,6 +7,7 @@ import { fmtAmount } from "./format.js";
 import ClientDetail from "./ClientDetail.jsx";
 import PaymentModal from "./PaymentModal.jsx";
 import AddClientModal from "./AddClientModal.jsx";
+import ThemeToggle from "./ThemeToggle.jsx";
 
 const FILTROS = [
   ["deben", "Deben"],
@@ -67,30 +68,33 @@ export default function OperatorPanel({ config, plans }) {
   };
 
   return (
-    <div className="min-h-screen bg-stone-100 text-slate-800">
+    <div className="min-h-screen bg-stone-100 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-3xl px-4 py-6">
         <header className="mb-5 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2 dark:text-slate-100">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-teal-600 text-white">
                 <Zap size={20} />
               </span>
               Yupana
             </h1>
-            <p className="text-sm text-slate-500 mt-1">Control de clientes y cobros</p>
+            <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">Control de clientes y cobros</p>
           </div>
-          <button
-            onClick={signOut}
-            className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"
-          >
-            <LogOut size={16} /> Salir
-          </button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <button
+              onClick={signOut}
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+            >
+              <LogOut size={16} /> Salir
+            </button>
+          </div>
         </header>
 
         <div className="grid grid-cols-3 gap-3 mb-5">
-          <Stat etiqueta="Por cobrar" valor={fmtAmount(totalPorCobrar, config)} acento="text-rose-600" />
-          <Stat etiqueta={`${config.clientTerm}s que deben`} valor={nDeben} acento="text-amber-600" />
-          <Stat etiqueta={`${config.clientTerm}s activos`} valor={nActivos} acento="text-teal-700" />
+          <Stat etiqueta="Por cobrar" valor={fmtAmount(totalPorCobrar, config)} acento="text-rose-600 dark:text-rose-400" />
+          <Stat etiqueta={`${config.clientTerm}s que deben`} valor={nDeben} acento="text-amber-600 dark:text-amber-400" />
+          <Stat etiqueta={`${config.clientTerm}s activos`} valor={nActivos} acento="text-teal-700 dark:text-teal-400" />
         </div>
 
         <div className="flex gap-2 mb-3">
@@ -100,7 +104,7 @@ export default function OperatorPanel({ config, plans }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar por nombre o código"
-              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-teal-500 focus:outline-none"
+              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
           <button
@@ -118,8 +122,8 @@ export default function OperatorPanel({ config, plans }) {
               onClick={() => setFiltro(k)}
               className={`rounded-full px-3 py-1 ${
                 filtro === k
-                  ? "bg-slate-800 text-white"
-                  : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
+                  ? "bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900"
+                  : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
               }`}
             >
               {label}
@@ -127,11 +131,11 @@ export default function OperatorPanel({ config, plans }) {
           ))}
         </div>
 
-        {loading && <p className="text-sm text-slate-500">Cargando...</p>}
+        {loading && <p className="text-sm text-slate-500 dark:text-slate-400">Cargando...</p>}
 
         <div className="space-y-2">
           {!loading && lista.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
               No hay {config.clientTerm.toLowerCase()}s en esta vista. Agrega uno o cambia el filtro.
             </div>
           )}
@@ -139,21 +143,27 @@ export default function OperatorPanel({ config, plans }) {
             <button
               key={c.id}
               onClick={() => setSelId(c.id)}
-              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-teal-400 hover:shadow-sm"
+              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-teal-400 hover:shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:hover:border-teal-500"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-900 truncate">{c.name}</p>
-                  <p className="text-xs text-slate-500 truncate">
+                  <p className="font-medium text-slate-900 truncate dark:text-slate-100">{c.name}</p>
+                  <p className="text-xs text-slate-500 truncate dark:text-slate-400">
                     {Object.values(c.customFields ?? {}).join(" · ")}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`font-semibold ${c.balance > 0 ? "text-rose-600" : "text-teal-700"}`}>
+                  <p
+                    className={`font-semibold ${
+                      c.balance > 0
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-teal-700 dark:text-teal-400"
+                    }`}
+                  >
                     {c.balance > 0 ? fmtAmount(c.balance, config) : "Al día"}
                   </p>
                   {c.status === "cancelled" && (
-                    <span className="text-xs text-slate-400">retirado</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">retirado</span>
                   )}
                 </div>
               </div>
@@ -193,8 +203,8 @@ export default function OperatorPanel({ config, plans }) {
 
 function Stat({ etiqueta, valor, acento }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <p className="text-xs text-slate-500">{etiqueta}</p>
+    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+      <p className="text-xs text-slate-500 dark:text-slate-400">{etiqueta}</p>
       <p className={`mt-1 text-lg font-bold ${acento}`}>{valor}</p>
     </div>
   );

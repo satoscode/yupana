@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "./AuthContext.jsx";
+import ThemeToggle from "./ThemeToggle.jsx";
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -22,26 +23,38 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-xl bg-white p-6 shadow-sm">
-        <h1 className="mb-4 text-xl font-bold text-slate-900">Yupana — Acceso</h1>
-        <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+    <div className="relative flex min-h-screen items-center justify-center bg-stone-100 px-4 dark:bg-slate-900">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+      <form
+        onSubmit={submit}
+        className="w-full max-w-sm rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800"
+      >
+        <h1 className="mb-4 text-xl font-bold text-slate-900 dark:text-slate-100">
+          Yupana — Acceso
+        </h1>
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+          Email
+        </label>
         <input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+          className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         />
-        <label className="mb-1 block text-xs font-medium text-slate-600">Contraseña</label>
+        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+          Contraseña
+        </label>
         <input
           type="password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         />
-        {error && <p className="mb-3 text-sm text-rose-600">{error}</p>}
+        {error && <p className="mb-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <button
           type="submit"
           disabled={loading}
