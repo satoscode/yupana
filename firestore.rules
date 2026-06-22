@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOperator() {
+      return request.auth != null;
+    }
+
+    // El ID del documento de cliente es el token aleatorio del enlace.
+    // El público solo puede pedir UN documento por su ID exacto (get);
+    // nunca puede listar/enumerar la colección.
+    match /clients/{clientId} {
+      allow get: if true;
+      allow list: if isOperator();
+      allow create, update, delete: if isOperator();
+
+      // Subcolección de pagos: para listarla hace falta conocer el
+      // clientId exacto (va en la ruta), igual que para leer el cliente.
+      // Así un cliente público nunca puede ver pagos de otro clientId.
+      match /payments/{paymentId} {
+        allow get, list: if true;
+        allow create, update, delete: if isOperator();
+      }
+    }
+
+    // Planes: catálogo no sensible (nombre/monto/ciclo), legible por
+    // cualquiera para que el panel público pueda resolver el saldo.
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if isOperator();
+    }
+
+    // Configuración de la vertical: no es dato de negocio sensible.
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if isOperator();
+    }
+  }
+}
