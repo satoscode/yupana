@@ -23,3 +23,21 @@ if (useEmulator) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
   connectFirestoreEmulator(db, "127.0.0.1", 8080);
 }
+
+// Instancia de Auth aislada (app secundaria) solo para crear cuentas nuevas
+// de staff desde "Gestionar roles". createUserWithEmailAndPassword inicia
+// sesión automáticamente como el usuario creado; usar la instancia principal
+// desconectaría al admin de su propia sesión. Memoizada porque tanto
+// initializeApp con el mismo nombre como connectAuthEmulator sobre la misma
+// instancia fallan si se llaman más de una vez.
+let staffCreationAuth;
+export function getStaffCreationAuth() {
+  if (!staffCreationAuth) {
+    const secondaryApp = initializeApp(firebaseConfig, "staff-creation");
+    staffCreationAuth = getAuth(secondaryApp);
+    if (useEmulator) {
+      connectAuthEmulator(staffCreationAuth, "http://127.0.0.1:9099", { disableWarnings: true });
+    }
+  }
+  return staffCreationAuth;
+}

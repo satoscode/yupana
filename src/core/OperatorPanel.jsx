@@ -1,12 +1,20 @@
 import React, { useMemo, useState } from "react";
-import { Search, UserPlus, Zap, LogOut } from "lucide-react";
+import { KeyRound, Search, UserCog, UserPlus, Zap, LogOut } from "lucide-react";
 import { useAuth } from "./AuthContext.jsx";
 import { useClientsWithBalance } from "./useClientsWithBalance.js";
-import { createClient, createPayment, setClientStatus } from "../data/db.js";
+import {
+  createClient,
+  createPayment,
+  deletePayment,
+  setClientStatus,
+  updateClient,
+} from "../data/db.js";
 import { fmtAmount } from "./format.js";
 import ClientDetail from "./ClientDetail.jsx";
 import PaymentModal from "./PaymentModal.jsx";
 import AddClientModal from "./AddClientModal.jsx";
+import StaffRolesModal from "./StaffRolesModal.jsx";
+import ChangePasswordModal from "./ChangePasswordModal.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 
 const FILTROS = [
@@ -16,14 +24,16 @@ const FILTROS = [
   ["todos", "Todos"],
 ];
 
-export default function OperatorPanel({ config, plans }) {
-  const { signOut } = useAuth();
+export default function OperatorPanel({ config, plans, isAdmin }) {
+  const { user, signOut } = useAuth();
   const { clients, loading, reload } = useClientsWithBalance();
   const [query, setQuery] = useState("");
   const [filtro, setFiltro] = useState("deben");
   const [selId, setSelId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [pagoFor, setPagoFor] = useState(null);
+  const [showRoles, setShowRoles] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const totalPorCobrar = clients
     .filter((c) => c.status === "active")
@@ -67,6 +77,16 @@ export default function OperatorPanel({ config, plans }) {
     await reload();
   };
 
+  const handleEdit = async (data) => {
+    await updateClient(sel.id, data);
+    await reload();
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    await deletePayment(sel.id, paymentId);
+    await reload();
+  };
+
   return (
     <div className="min-h-screen bg-stone-100 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-3xl px-4 py-6">
@@ -82,6 +102,22 @@ export default function OperatorPanel({ config, plans }) {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            {isAdmin && (
+              <button
+                onClick={() => setShowRoles(true)}
+                aria-label="Gestionar roles"
+                className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+              >
+                <UserCog size={16} />
+              </button>
+            )}
+            <button
+              onClick={() => setShowChangePassword(true)}
+              aria-label="Cambiar contraseña"
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+            >
+              <KeyRound size={16} />
+            </button>
             <button
               onClick={signOut}
               className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
@@ -176,9 +212,13 @@ export default function OperatorPanel({ config, plans }) {
         <ClientDetail
           client={sel}
           config={config}
+          plans={plans}
+          isAdmin={isAdmin}
           onClose={() => setSelId(null)}
           onPagar={() => setPagoFor(sel)}
           onToggle={handleToggle}
+          onEdit={handleEdit}
+          onDeletePayment={handleDeletePayment}
         />
       )}
       {pagoFor && (
@@ -196,6 +236,10 @@ export default function OperatorPanel({ config, plans }) {
           onClose={() => setShowAdd(false)}
           onSave={handleAddClient}
         />
+      )}
+      {showRoles && <StaffRolesModal currentUid={user.uid} onClose={() => setShowRoles(false)} />}
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}
     </div>
   );

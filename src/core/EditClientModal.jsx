@@ -1,14 +1,19 @@
 import React, { useState } from "react";
-import { Plus } from "lucide-react";
+import { Check } from "lucide-react";
 import { Modal } from "./PaymentModal.jsx";
 import Campo from "./Campo.jsx";
 
-export default function AddClientModal({ config, plans, onClose, onSave }) {
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [planId, setPlanId] = useState(plans[0]?.id ?? "");
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [customFields, setCustomFields] = useState({});
+// Solo admin: editar la info base de un cliente ya existente (nombre, plan,
+// fecha de alta, campos extra). El operador no tiene acceso a este modal
+// (gateado en ClientDetail.jsx) ni a estos campos vía Firestore Rules.
+export default function EditClientModal({ client, config, plans, onClose, onSave }) {
+  const [name, setName] = useState(client.name);
+  const [code, setCode] = useState(client.code ?? "");
+  const [planId, setPlanId] = useState(client.planId ?? plans[0]?.id ?? "");
+  const [startDate, setStartDate] = useState(
+    typeof client.startDate === "string" ? client.startDate.slice(0, 10) : ""
+  );
+  const [customFields, setCustomFields] = useState(client.customFields ?? {});
   const [saving, setSaving] = useState(false);
 
   const setField = (key, value) =>
@@ -26,7 +31,7 @@ export default function AddClientModal({ config, plans, onClose, onSave }) {
   };
 
   return (
-    <Modal onClose={onClose} titulo={`Agregar ${config.clientTerm.toLowerCase()}`}>
+    <Modal onClose={onClose} titulo={`Editar ${config.clientTerm.toLowerCase()}`}>
       <div className="space-y-3">
         <Campo label="Nombre" value={name} onChange={setName} />
         <Campo label="Código" value={code} onChange={setCode} />
@@ -46,12 +51,7 @@ export default function AddClientModal({ config, plans, onClose, onSave }) {
             ))}
           </select>
         </div>
-        <Campo
-          label="Fecha de alta"
-          type="date"
-          value={startDate}
-          onChange={setStartDate}
-        />
+        <Campo label="Fecha de alta" type="date" value={startDate} onChange={setStartDate} />
         {config.customFields.map((field) => (
           <Campo
             key={field.key}
@@ -67,7 +67,7 @@ export default function AddClientModal({ config, plans, onClose, onSave }) {
         onClick={submit}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40"
       >
-        <Plus size={16} /> {saving ? "Guardando..." : "Guardar"}
+        <Check size={16} /> {saving ? "Guardando..." : "Guardar cambios"}
       </button>
     </Modal>
   );
