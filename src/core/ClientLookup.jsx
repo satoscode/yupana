@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { AlertCircle, BadgeCheck, Zap } from "lucide-react";
 import { getClient, listPayments, listPlans } from "../data/db.js";
 import { calculateBalance, resolvePlanFields } from "../lib/balance.js";
-import { fmtAmount, fmtDate } from "./format.js";
+import { fmtAmount, fmtDate, fmtDateTime } from "./format.js";
 import { activeConfig } from "../config/index.js";
 import ThemeToggle from "./ThemeToggle.jsx";
 
@@ -116,7 +116,7 @@ export default function ClientLookup() {
                         −{fmtAmount(p.amount, config)}
                       </span>
                       <p className="text-xs text-slate-400 dark:text-slate-500">
-                        {fmtDate(p.date, config)}
+                        {fmtDateTime(p.date, config)}
                       </p>
                     </div>
                   </div>

@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { allocateLedger } from "../lib/balance.js";
-import { fmtAmount, fmtDate, fmtMonth } from "./format.js";
+import { fmtAmount, fmtDate, fmtDateTime, fmtMonth } from "./format.js";
 import EditClientModal from "./EditClientModal.jsx";
 
 const CARGO_ESTADO = {
@@ -57,6 +57,7 @@ export default function ClientDetail({
       amount: p.amount,
       method: p.method,
       coversMonth: p.coversMonth,
+      registeredByEmail: p.registeredByEmail,
     }));
     return [...cargos, ...pagos].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [client]);
@@ -179,7 +180,8 @@ export default function ClientDetail({
                         : fmtAmount(m.amount, config)}
                     </span>
                     <p className="text-xs text-slate-400 dark:text-slate-500">
-                      {fmtDate(m.date, config)}
+                      {m.kind === "pago" ? fmtDateTime(m.date, config) : fmtDate(m.date, config)}
+                      {m.kind === "pago" && m.registeredByEmail && ` · ${m.registeredByEmail}`}
                     </p>
                   </div>
                   {m.kind === "pago" && isAdmin && (

@@ -13,7 +13,6 @@ import {
   query,
   where,
   orderBy,
-  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase.js";
 
@@ -60,7 +59,7 @@ export async function createClient(data) {
     code: data.code ?? null,
     notes: data.notes ?? null,
     customFields: data.customFields ?? {},
-    createdAt: serverTimestamp(),
+    createdAt: new Date().toISOString(),
     endedAt: null,
   });
   return ref.id;
@@ -73,7 +72,7 @@ export async function updateClient(id, data) {
 export async function setClientStatus(id, status) {
   await updateDoc(doc(db, "clients", id), {
     status,
-    endedAt: status === "active" ? null : serverTimestamp(),
+    endedAt: status === "active" ? null : new Date().toISOString(),
   });
 }
 
@@ -88,9 +87,11 @@ export async function listPayments(clientId) {
 export async function createPayment(data) {
   const ref = await addDoc(paymentsCol(data.clientId), {
     amount: data.amount,
-    date: data.date ?? serverTimestamp(),
+    date: data.date ?? new Date().toISOString(),
     method: data.method,
     note: data.note ?? null,
+    registeredBy: data.registeredBy ?? null,
+    registeredByEmail: data.registeredByEmail ?? null,
   });
   return ref.id;
 }

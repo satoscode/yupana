@@ -67,7 +67,13 @@ export default function OperatorPanel({ config, plans, isAdmin }) {
   };
 
   const handlePayment = async (amount, method) => {
-    await createPayment({ clientId: pagoFor.id, amount, method });
+    await createPayment({
+      clientId: pagoFor.id,
+      amount,
+      method,
+      registeredBy: user.uid,
+      registeredByEmail: user.email,
+    });
     setPagoFor(null);
     await reload();
   };
