@@ -1,17 +1,25 @@
 // Siembra datos de ejemplo de la vertical "agua potable" (ver
 // water-demo-data.js) en el emulador local de Firestore + crea un usuario
-// operador en el emulador de Auth. Solo para desarrollo local
+// admin en el emulador de Auth. Solo para desarrollo local
 // (npm run dev:emulator).
-import { initializeApp } from "firebase/app";
-import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth } from "firebase/auth";
-import { collection, connectFirestoreEmulator, doc, getFirestore, setDoc } from "firebase/firestore";
+//
+// Usa firebase-admin (no firebase/client SDK) porque necesita crear el
+// primer documento staff/{uid} con rol admin — y las Firestore Rules exigen
+// ya ser admin para escribir en "staff", así que ese primer registro no se
+// puede crear respetando las rules vía el SDK de cliente. Admin SDK siempre
+// se salta las rules; eso es seguro aquí porque solo corre contra el
+// emulador local, nunca contra un proyecto real (no requiere plan Blaze).
+process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
+
+import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import { plans, clients } from "./water-demo-data.js";
 
-const app = initializeApp({ projectId: "demo-yupana", apiKey: "demo-api-key" });
+const app = initializeApp({ projectId: "demo-yupana" });
 const auth = getAuth(app);
 const db = getFirestore(app);
-connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-connectFirestoreEmulator(db, "127.0.0.1", 8080);
 
 function monthsAgo(n) {
   const d = new Date();
@@ -19,24 +27,35 @@ function monthsAgo(n) {
   return d.toISOString();
 }
 
-const OPERATOR_EMAIL = "operador@yupana.test";
-const OPERATOR_PASSWORD = "yupana123";
+const ADMIN_EMAIL = "operador@yupana.test";
+const ADMIN_PASSWORD = "yupana123";
+
+async function ensureAdminUser() {
+  try {
+    const existing = await auth.getUserByEmail(ADMIN_EMAIL);
+    return existing.uid;
+  } catch {
+    const created = await auth.createUser({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
+    return created.uid;
+  }
+}
 
 async function seed() {
-  await createUserWithEmailAndPassword(auth, OPERATOR_EMAIL, OPERATOR_PASSWORD).catch((err) => {
-    if (err.code !== "auth/email-already-in-use") throw err;
-  });
+  const uid = await ensureAdminUser();
+  // Cuenta de prueba sembrada como admin para poder probar todo (editar
+  // clientes, gestionar roles) de entrada en local.
+  await db.doc(`staff/${uid}`).set({ email: ADMIN_EMAIL, role: "admin" });
 
   const planIdByKey = {};
   for (const { key, ...plan } of plans) {
-    const ref = doc(collection(db, "plans"));
-    await setDoc(ref, plan);
+    const ref = db.collection("plans").doc();
+    await ref.set(plan);
     planIdByKey[key] = ref.id;
   }
 
   for (const c of clients) {
-    const ref = doc(collection(db, "clients"));
-    await setDoc(ref, {
+    const ref = db.collection("clients").doc();
+    await ref.set({
       name: c.name,
       contact: null,
       planId: planIdByKey[c.planKey],
@@ -52,7 +71,7 @@ async function seed() {
       endedAt: c.endedAt ?? null,
     });
     if (c.name === "Ana Demo Pérez") {
-      await setDoc(doc(db, "clients", ref.id, "payments", "pago1"), {
+      await ref.collection("payments").doc("pago1").set({
         amount: 25,
         method: "Efectivo",
         date: monthsAgo(1),
@@ -61,9 +80,9 @@ async function seed() {
     console.log(`Usuario creado: ${c.name} -> http://localhost:5173/${ref.id}`);
   }
 
-  console.log("\nOperador de prueba:");
-  console.log(`  email: ${OPERATOR_EMAIL}`);
-  console.log(`  password: ${OPERATOR_PASSWORD}`);
+  console.log("\nCuenta de prueba (rol admin):");
+  console.log(`  email: ${ADMIN_EMAIL}`);
+  console.log(`  password: ${ADMIN_PASSWORD}`);
   console.log("\nSemilla completa.");
   process.exit(0);
 }
