@@ -9,6 +9,7 @@ import {
   addDoc,
   updateDoc,
   setDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -24,6 +25,7 @@ const plansCol = () => collection(db, "plans");
 // Firestore Rules tengan que "adivinar" si conoce su propio ID.
 const paymentsCol = (clientId) => collection(db, "clients", clientId, "payments");
 const configDoc = () => doc(db, "config", "default");
+const staffCol = () => collection(db, "staff");
 
 function withId(snap) {
   return { id: snap.id, ...snap.data() };
@@ -93,6 +95,10 @@ export async function createPayment(data) {
   return ref.id;
 }
 
+export async function deletePayment(clientId, paymentId) {
+  await deleteDoc(doc(paymentsCol(clientId), paymentId));
+}
+
 // ---------- plans ----------
 
 export async function listPlans() {
@@ -125,4 +131,24 @@ export async function getConfig() {
 
 export async function saveConfig(data) {
   await setDoc(configDoc(), data, { merge: true });
+}
+
+// ---------- staff (roles del equipo) ----------
+
+export async function getStaffRole(uid) {
+  const snap = await getDoc(doc(staffCol(), uid));
+  return snap.exists() ? snap.data().role : null;
+}
+
+export async function listStaff() {
+  const snap = await getDocs(staffCol());
+  return snap.docs.map(withId);
+}
+
+export async function setStaffRole(uid, { email, role }) {
+  await setDoc(doc(staffCol(), uid), { email, role });
+}
+
+export async function removeStaff(uid) {
+  await deleteDoc(doc(staffCol(), uid));
 }
