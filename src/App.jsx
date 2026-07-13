@@ -1,17 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./core/AuthContext.jsx";
 import Login from "./core/Login.jsx";
 import OperatorPanel from "./core/OperatorPanel.jsx";
-import { listPlans } from "./data/db.js";
+import { getConfig, listPlans } from "./data/db.js";
 import { activeConfig } from "./config/index.js";
+import { applyConfigOverrides } from "./config/resolveConfig.js";
 
 function Authenticated() {
   const { user, role, isAdmin, loading, signOut } = useAuth();
   const [plans, setPlans] = useState(null);
+  const [config, setConfig] = useState(null);
+
+  const reloadPlans = useCallback(() => listPlans().then(setPlans), []);
+  const reloadConfig = useCallback(
+    () => getConfig().then((overrides) => setConfig(applyConfigOverrides(activeConfig, overrides))),
+    []
+  );
 
   useEffect(() => {
-    if (user) listPlans().then(setPlans);
-  }, [user]);
+    if (user) {
+      reloadPlans();
+      reloadConfig();
+    }
+  }, [user, reloadPlans, reloadConfig]);
 
   if (loading) return <FullScreenMessage text="Cargando..." />;
   if (!user) return <Login />;
@@ -27,9 +38,17 @@ function Authenticated() {
       </FullScreenMessage>
     );
   }
-  if (!plans) return <FullScreenMessage text="Cargando..." />;
+  if (!plans || !config) return <FullScreenMessage text="Cargando..." />;
 
-  return <OperatorPanel config={activeConfig} plans={plans} isAdmin={isAdmin} />;
+  return (
+    <OperatorPanel
+      config={config}
+      plans={plans}
+      isAdmin={isAdmin}
+      onReloadPlans={reloadPlans}
+      onReloadConfig={reloadConfig}
+    />
+  );
 }
 
 function FullScreenMessage({ text, children }) {

@@ -52,16 +52,19 @@ service cloud.firestore {
     }
 
     // Planes: catálogo no sensible (nombre/monto/ciclo), legible por
-    // cualquiera para que el panel público pueda resolver el saldo.
+    // cualquiera para que el panel público pueda resolver el saldo. Crear y
+    // editar planes es una acción estructural — solo admin (igual que
+    // editar info de cliente o gestionar roles).
     match /plans/{planId} {
       allow read: if true;
-      allow write: if isStaff();
+      allow write: if isAdmin();
     }
 
-    // Configuración de la vertical: no es dato de negocio sensible.
+    // Configuración de la vertical: no es dato de negocio sensible, pero
+    // renombrar etiquetas/métodos de pago es estructural — solo admin.
     match /config/{configId} {
       allow read: if true;
-      allow write: if isStaff();
+      allow write: if isAdmin();
     }
   }
 }

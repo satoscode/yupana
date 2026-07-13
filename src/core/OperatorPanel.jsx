@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { KeyRound, Search, UserCog, UserPlus, Zap, LogOut } from "lucide-react";
+import { KeyRound, Search, Settings, UserCog, UserPlus, Zap, LogOut } from "lucide-react";
 import { useAuth } from "./AuthContext.jsx";
 import { useClientsWithBalance } from "./useClientsWithBalance.js";
 import {
@@ -14,6 +14,7 @@ import ClientDetail from "./ClientDetail.jsx";
 import PaymentModal from "./PaymentModal.jsx";
 import AddClientModal from "./AddClientModal.jsx";
 import StaffRolesModal from "./StaffRolesModal.jsx";
+import SettingsModal from "./SettingsModal.jsx";
 import ChangePasswordModal from "./ChangePasswordModal.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 
@@ -24,7 +25,7 @@ const FILTROS = [
   ["todos", "Todos"],
 ];
 
-export default function OperatorPanel({ config, plans, isAdmin }) {
+export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, onReloadConfig }) {
   const { user, signOut } = useAuth();
   const { clients, loading, reload } = useClientsWithBalance();
   const [query, setQuery] = useState("");
@@ -33,6 +34,7 @@ export default function OperatorPanel({ config, plans, isAdmin }) {
   const [showAdd, setShowAdd] = useState(false);
   const [pagoFor, setPagoFor] = useState(null);
   const [showRoles, setShowRoles] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
   const totalPorCobrar = clients
@@ -108,6 +110,15 @@ export default function OperatorPanel({ config, plans, isAdmin }) {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            {isAdmin && (
+              <button
+                onClick={() => setShowSettings(true)}
+                aria-label="Configuración"
+                className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+              >
+                <Settings size={16} />
+              </button>
+            )}
             {isAdmin && (
               <button
                 onClick={() => setShowRoles(true)}
@@ -244,6 +255,18 @@ export default function OperatorPanel({ config, plans, isAdmin }) {
         />
       )}
       {showRoles && <StaffRolesModal currentUid={user.uid} onClose={() => setShowRoles(false)} />}
+      {showSettings && (
+        <SettingsModal
+          config={config}
+          onClose={async () => {
+            setShowSettings(false);
+            await onReloadConfig();
+            await onReloadPlans();
+            await reload();
+          }}
+          onSaved={onReloadConfig}
+        />
+      )}
       {showChangePassword && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}

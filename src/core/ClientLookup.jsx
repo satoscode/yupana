@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AlertCircle, BadgeCheck, Zap } from "lucide-react";
-import { getClient, listPayments, listPlans } from "../data/db.js";
+import { getClient, getConfig, listPayments, listPlans } from "../data/db.js";
 import { calculateBalance, resolvePlanFields } from "../lib/balance.js";
 import { fmtAmount, fmtDate, fmtDateTime } from "./format.js";
 import { activeConfig } from "../config/index.js";
+import { applyConfigOverrides } from "../config/resolveConfig.js";
 import ThemeToggle from "./ThemeToggle.jsx";
 
 export default function ClientLookup() {
   const { token } = useParams();
   const [state, setState] = useState("loading"); // loading | notfound | ready
   const [client, setClient] = useState(null);
+  const [config, setConfig] = useState(activeConfig);
 
   useEffect(() => {
     let active = true;
@@ -20,11 +22,16 @@ export default function ClientLookup() {
         if (active) setState("notfound");
         return;
       }
-      const [payments, plans] = await Promise.all([listPayments(token), listPlans()]);
+      const [payments, plans, configOverrides] = await Promise.all([
+        listPayments(token),
+        listPlans(),
+        getConfig(),
+      ]);
       const plan = plans.find((p) => p.id === c.planId) ?? { amount: 0, cycle: "monthly" };
       const resolved = resolvePlanFields(c, plan);
       const balance = calculateBalance({ ...c, ...resolved }, payments);
       if (active) {
+        setConfig(applyConfigOverrides(activeConfig, configOverrides));
         setClient({ ...c, ...resolved, plan, payments, ...balance });
         setState("ready");
       }
@@ -34,8 +41,6 @@ export default function ClientLookup() {
       active = false;
     };
   }, [token]);
-
-  const config = activeConfig;
 
   return (
     <div className="min-h-screen bg-stone-100 px-4 py-8 dark:bg-slate-900">

@@ -131,6 +131,12 @@ describe("firestore.rules — operador", () => {
     await assertFails(setDoc(doc(db, "staff", "nuevoUid"), { role: "admin" }));
   });
 
+  it("NO puede crear/editar planes ni la config de la vertical", async () => {
+    const db = testEnv.authenticatedContext(OPERATOR_UID).firestore();
+    await assertFails(setDoc(doc(db, "plans", "plan2"), { name: "Nuevo", amount: 10 }));
+    await assertFails(setDoc(doc(db, "config", "default"), { clientTerm: "Otro" }));
+  });
+
   it("puede leer su propio doc de staff", async () => {
     const db = testEnv.authenticatedContext(OPERATOR_UID).firestore();
     await assertSucceeds(getDoc(doc(db, "staff", OPERATOR_UID)));
@@ -159,5 +165,11 @@ describe("firestore.rules — admin", () => {
     const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
     await assertSucceeds(getDocs(collection(db, "staff")));
     await assertSucceeds(setDoc(doc(db, "staff", "nuevoUid"), { email: "x@x.com", role: "operator" }));
+  });
+
+  it("puede crear/editar planes y la config de la vertical", async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertSucceeds(setDoc(doc(db, "plans", "plan2"), { name: "Nuevo", amount: 10 }));
+    await assertSucceeds(setDoc(doc(db, "config", "default"), { clientTerm: "Otro" }));
   });
 });
