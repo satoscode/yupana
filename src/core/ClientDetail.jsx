@@ -96,6 +96,9 @@ export default function ClientDetail({
         {client.code && (
           <p className="text-xs text-slate-400 mt-1 dark:text-slate-500">Código {client.code}</p>
         )}
+        {client.notes && (
+          <p className="text-xs text-slate-500 mt-1 italic dark:text-slate-400">{client.notes}</p>
+        )}
 
         <div className="mt-4 rounded-lg bg-stone-100 p-4 dark:bg-slate-900">
           <p className="text-xs text-slate-500 dark:text-slate-400">Saldo actual</p>

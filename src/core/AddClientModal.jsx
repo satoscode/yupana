@@ -9,6 +9,7 @@ export default function AddClientModal({ config, plans, onClose, onSave }) {
   const [planId, setPlanId] = useState(plans[0]?.id ?? "");
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [customFields, setCustomFields] = useState({});
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   const setField = (key, value) =>
@@ -19,7 +20,7 @@ export default function AddClientModal({ config, plans, onClose, onSave }) {
   const submit = async () => {
     setSaving(true);
     try {
-      await onSave({ name, code, planId, startDate, customFields });
+      await onSave({ name, code, planId, startDate, customFields, notes });
     } finally {
       setSaving(false);
     }
@@ -61,6 +62,17 @@ export default function AddClientModal({ config, plans, onClose, onSave }) {
             onChange={(v) => setField(field.key, v)}
           />
         ))}
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
+            Notas
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
       </div>
       <button
         disabled={!valido || saving}
