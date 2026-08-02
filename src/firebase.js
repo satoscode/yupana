@@ -1,6 +1,12 @@
 import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 
 const useEmulator = import.meta.env.VITE_USE_FIREBASE_EMULATOR === "true";
 
@@ -17,7 +23,19 @@ const firebaseConfig = useEmulator
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Persistencia offline: el uso real es un operador con el celular en
+// movimiento (visitando clientes, cobrando puerta a puerta) donde la señal
+// no siempre es buena. Con esto, un pago registrado sin conexión queda en
+// caché local (IndexedDB) y se sincroniza solo cuando vuelve la señal, en
+// vez de simplemente fallar. Multi-tab por si el operador tiene la app
+// abierta en más de una pestaña. Se omite contra el emulador: sin esto, el
+// caché local sobreviviría a un reseed del emulador y mostraría datos
+// viejos que ya no existen en el backend de desarrollo.
+export const db = useEmulator
+  ? getFirestore(app)
+  : initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
 
 // Se usa el hostname con el que el navegador cargó la página (no un
 // 127.0.0.1 fijo) para que también funcione al acceder desde otro
