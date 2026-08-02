@@ -30,6 +30,7 @@ const CLIENT_A = "clientTokenA";
 const CLIENT_B = "clientTokenB";
 const ADMIN_UID = "admin1";
 const OPERATOR_UID = "operator1";
+const OPERATOR_NO_ADD_UID = "operator2";
 
 async function seed() {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -39,7 +40,13 @@ async function seed() {
     await setDoc(doc(db, "clients", CLIENT_A, "payments", "p1"), { amount: 70, method: "Tienda" });
     await setDoc(doc(db, "plans", "plan1"), { name: "Básico", amount: 70, cycle: "monthly" });
     await setDoc(doc(db, "staff", ADMIN_UID), { email: "admin@test.com", role: "admin" });
+    // Sin canAddClients: prueba que el default (ausente = permitido) funciona.
     await setDoc(doc(db, "staff", OPERATOR_UID), { email: "op@test.com", role: "operator" });
+    await setDoc(doc(db, "staff", OPERATOR_NO_ADD_UID), {
+      email: "op2@test.com",
+      role: "operator",
+      canAddClients: false,
+    });
   });
 }
 
@@ -98,9 +105,14 @@ describe("firestore.rules — operador", () => {
     );
   });
 
-  it("puede crear clientes nuevos", async () => {
+  it("puede crear clientes nuevos (canAddClients ausente = permitido por default)", async () => {
     const db = testEnv.authenticatedContext(OPERATOR_UID).firestore();
     await assertSucceeds(setDoc(doc(db, "clients", "nuevoToken"), { name: "Nuevo" }));
+  });
+
+  it("NO puede crear clientes si canAddClients es false", async () => {
+    const db = testEnv.authenticatedContext(OPERATOR_NO_ADD_UID).firestore();
+    await assertFails(setDoc(doc(db, "clients", "nuevoToken"), { name: "Nuevo" }));
   });
 
   it("NO puede retirar/reactivar (status + endedAt) — eso es admin-only", async () => {

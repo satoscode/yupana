@@ -8,13 +8,14 @@ import {
   updatePassword,
 } from "firebase/auth";
 import { auth } from "../firebase.js";
-import { getStaffRole } from "../data/db.js";
+import { getStaffDoc } from "../data/db.js";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined); // undefined = cargando, null = sin sesión
   const [role, setRole] = useState(undefined); // undefined = cargando, null = sin rol asignado
+  const [canAddClients, setCanAddClients] = useState(true);
 
   useEffect(
     () =>
@@ -25,7 +26,10 @@ export function AuthProvider({ children }) {
           return;
         }
         setRole(undefined);
-        getStaffRole(u.uid).then(setRole);
+        getStaffDoc(u.uid).then((staffDoc) => {
+          setRole(staffDoc?.role ?? null);
+          setCanAddClients(staffDoc?.canAddClients ?? true);
+        });
       }),
     []
   );
@@ -34,6 +38,9 @@ export function AuthProvider({ children }) {
     user,
     role,
     isAdmin: role === "admin",
+    // Un admin siempre puede, sin importar el campo — el permiso puntual
+    // solo restringe operadores (ver canAddClients() en firestore.rules).
+    canAddClients: role === "admin" || canAddClients,
     loading: user === undefined || (user && role === undefined),
     signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
     signOut: () => firebaseSignOut(auth),

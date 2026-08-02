@@ -37,7 +37,7 @@ const FILTROS = [
 ];
 
 export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, onReloadConfig }) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, canAddClients } = useAuth();
   const {
     clients,
     loading,
@@ -216,12 +216,14 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
               className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-          >
-            <UserPlus size={16} /> Agregar
-          </button>
+          {canAddClients && (
+            <button
+              onClick={() => setShowAdd(true)}
+              className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+            >
+              <UserPlus size={16} /> Agregar
+            </button>
+          )}
         </div>
 
         <div className="flex gap-2 mb-4 text-sm">

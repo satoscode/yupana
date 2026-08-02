@@ -204,9 +204,11 @@ export async function saveConfig(data) {
 
 // ---------- staff (roles del equipo) ----------
 
-export async function getStaffRole(uid) {
+// Devuelve el doc completo (role + permisos puntuales como canAddClients),
+// no solo el role — AuthContext.jsx necesita ambos para el usuario logueado.
+export async function getStaffDoc(uid) {
   const snap = await getDoc(doc(staffCol(), uid));
-  return snap.exists() ? snap.data().role : null;
+  return snap.exists() ? snap.data() : null;
 }
 
 export async function listStaff() {
@@ -214,8 +216,8 @@ export async function listStaff() {
   return snap.docs.map(withId);
 }
 
-export async function setStaffRole(uid, { email, role }) {
-  await setDoc(doc(staffCol(), uid), { email, role });
+export async function setStaffRole(uid, { email, role, canAddClients = true }) {
+  await setDoc(doc(staffCol(), uid), { email, role, canAddClients });
 }
 
 export async function removeStaff(uid) {

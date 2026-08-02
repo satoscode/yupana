@@ -15,6 +15,7 @@ export default function StaffRolesModal({ currentUid, onClose }) {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("operator");
+  const [canAddClientsNew, setCanAddClientsNew] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -33,10 +34,11 @@ export default function StaffRolesModal({ currentUid, onClose }) {
       const secondaryAuth = getStaffCreationAuth();
       const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
       await signOut(secondaryAuth); // limpia la sesión secundaria; no afecta al admin
-      await setStaffRole(cred.user.uid, { email, role });
+      await setStaffRole(cred.user.uid, { email, role, canAddClients: canAddClientsNew });
       setUsuario("");
       setPassword("");
       setRole("operator");
+      setCanAddClientsNew(true);
       await reload();
     } catch (err) {
       setError(
@@ -50,7 +52,16 @@ export default function StaffRolesModal({ currentUid, onClose }) {
   };
 
   const changeRole = async (member, newRole) => {
-    await setStaffRole(member.id, { email: member.email, role: newRole });
+    await setStaffRole(member.id, {
+      email: member.email,
+      role: newRole,
+      canAddClients: member.canAddClients ?? true,
+    });
+    await reload();
+  };
+
+  const toggleCanAddClients = async (member, canAddClients) => {
+    await setStaffRole(member.id, { email: member.email, role: member.role, canAddClients });
     await reload();
   };
 
@@ -68,33 +79,45 @@ export default function StaffRolesModal({ currentUid, onClose }) {
         {staff?.map((member) => (
           <div
             key={member.id}
-            className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2 text-sm dark:border-slate-700"
+            className="rounded-lg border border-slate-200 p-2 text-sm dark:border-slate-700"
           >
-            <div className="min-w-0">
-              <p className="truncate font-medium text-slate-800 dark:text-slate-200">
-                {emailToUsername(member.email) || member.id}
-              </p>
-              <p className="truncate text-xs text-slate-400 dark:text-slate-500">{member.id}</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-slate-800 dark:text-slate-200">
+                  {emailToUsername(member.email) || member.id}
+                </p>
+                <p className="truncate text-xs text-slate-400 dark:text-slate-500">{member.id}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <select
+                  value={member.role}
+                  onChange={(e) => changeRole(member, e.target.value)}
+                  disabled={member.id === currentUid}
+                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="operator">Operador</option>
+                </select>
+                <button
+                  onClick={() => remove(member)}
+                  disabled={member.id === currentUid}
+                  aria-label="Quitar acceso"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 disabled:opacity-30 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <select
-                value={member.role}
-                onChange={(e) => changeRole(member, e.target.value)}
-                disabled={member.id === currentUid}
-                className="rounded-lg border border-slate-300 px-2 py-1 text-xs focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-              >
-                <option value="admin">Admin</option>
-                <option value="operator">Operador</option>
-              </select>
-              <button
-                onClick={() => remove(member)}
-                disabled={member.id === currentUid}
-                aria-label="Quitar acceso"
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 disabled:opacity-30 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
+            {member.role === "operator" && (
+              <label className="mt-2 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={member.canAddClients ?? true}
+                  onChange={(e) => toggleCanAddClients(member, e.target.checked)}
+                />
+                Puede agregar clientes
+              </label>
+            )}
           </div>
         ))}
       </div>
@@ -127,6 +150,16 @@ export default function StaffRolesModal({ currentUid, onClose }) {
           <option value="admin">Admin</option>
           <option value="operator">Operador</option>
         </select>
+        {role === "operator" && (
+          <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+            <input
+              type="checkbox"
+              checked={canAddClientsNew}
+              onChange={(e) => setCanAddClientsNew(e.target.checked)}
+            />
+            Puede agregar clientes
+          </label>
+        )}
       </div>
       {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
       <button

@@ -17,6 +17,17 @@ service cloud.firestore {
         get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == "admin";
     }
 
+    // Permiso puntual por operador (no por rol): un admin puede desactivarle
+    // a un operador específico la posibilidad de agregar clientes nuevos,
+    // sin tocar el resto de sus permisos de "cobrar". Default true (ausente
+    // = permitido) para no romper operadores ya creados antes de que
+    // existiera este campo.
+    function canAddClients() {
+      return isAdmin() ||
+        (isStaff() &&
+          get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('canAddClients', true) == true);
+    }
+
     match /staff/{uid} {
       allow get: if request.auth != null && (request.auth.uid == uid || isAdmin());
       allow list: if isAdmin();
@@ -29,7 +40,7 @@ service cloud.firestore {
     match /clients/{clientId} {
       allow get: if true;
       allow list: if isStaff();
-      allow create: if isStaff();
+      allow create: if canAddClients();
       // Editar cualquier campo del cliente (incluido status/endedAt —
       // retirar/reactivar) es solo de admin. El operador únicamente cobra:
       // crea pagos (ver payments más abajo), no toca el doc del cliente.
