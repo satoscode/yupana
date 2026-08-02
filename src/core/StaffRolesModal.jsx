@@ -4,12 +4,15 @@ import { Plus, Trash2, UserCog } from "lucide-react";
 import { Modal } from "./PaymentModal.jsx";
 import { getStaffCreationAuth } from "../firebase.js";
 import { listStaff, setStaffRole, removeStaff } from "../data/db.js";
+import { usernameToEmail, emailToUsername } from "./staffLogin.js";
 
-// Solo admin: crear cuentas nuevas (email + contraseña) y asignarles rol, o
-// cambiar/quitar el rol de alguien que ya tiene cuenta.
+// Solo admin: crear cuentas nuevas (usuario + contraseña) y asignarles rol,
+// o cambiar/quitar el rol de alguien que ya tiene cuenta. El "usuario" se
+// traduce a un email sintético para Firebase Auth (ver staffLogin.js) — el
+// operador nunca necesita saber ni recordar un email.
 export default function StaffRolesModal({ currentUid, onClose }) {
   const [staff, setStaff] = useState(null);
-  const [email, setEmail] = useState("");
+  const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("operator");
   const [error, setError] = useState("");
@@ -22,22 +25,23 @@ export default function StaffRolesModal({ currentUid, onClose }) {
   }, []);
 
   const addStaff = async () => {
-    if (!email.trim() || !password) return;
+    if (!usuario.trim() || !password) return;
     setSaving(true);
     setError("");
     try {
+      const email = usernameToEmail(usuario);
       const secondaryAuth = getStaffCreationAuth();
-      const cred = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
       await signOut(secondaryAuth); // limpia la sesión secundaria; no afecta al admin
-      await setStaffRole(cred.user.uid, { email: email.trim(), role });
-      setEmail("");
+      await setStaffRole(cred.user.uid, { email, role });
+      setUsuario("");
       setPassword("");
       setRole("operator");
       await reload();
     } catch (err) {
       setError(
         err.code === "auth/email-already-in-use"
-          ? "Ese email ya tiene una cuenta."
+          ? "Ese usuario ya existe."
           : "No se pudo crear la cuenta."
       );
     } finally {
@@ -68,7 +72,7 @@ export default function StaffRolesModal({ currentUid, onClose }) {
           >
             <div className="min-w-0">
               <p className="truncate font-medium text-slate-800 dark:text-slate-200">
-                {member.email || member.id}
+                {emailToUsername(member.email) || member.id}
               </p>
               <p className="truncate text-xs text-slate-400 dark:text-slate-500">{member.id}</p>
             </div>
@@ -100,10 +104,12 @@ export default function StaffRolesModal({ currentUid, onClose }) {
       </h3>
       <div className="space-y-2">
         <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
+          type="text"
+          autoCapitalize="none"
+          autoCorrect="off"
+          value={usuario}
+          onChange={(e) => setUsuario(e.target.value)}
+          placeholder="Usuario (p. ej. marcelo)"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         />
         <input
@@ -125,7 +131,7 @@ export default function StaffRolesModal({ currentUid, onClose }) {
       {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
       <button
         onClick={addStaff}
-        disabled={!email.trim() || !password || saving}
+        disabled={!usuario.trim() || !password || saving}
         className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40"
       >
         <Plus size={16} /> {saving ? "Creando..." : "Crear cuenta"}
