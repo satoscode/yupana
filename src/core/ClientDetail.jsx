@@ -4,15 +4,21 @@ import {
   ArrowLeft,
   CalendarClock,
   CheckCircle2,
+  Pause,
   Pencil,
   Power,
   RotateCcw,
+  Share2,
+  Tag,
   Trash2,
   Wallet,
 } from "lucide-react";
 import { allocateLedger } from "../lib/balance.js";
 import { fmtAmount, fmtDate, fmtDateTime, fmtMonth } from "./format.js";
 import EditClientModal from "./EditClientModal.jsx";
+import ChargeOverrideModal from "./ChargeOverrideModal.jsx";
+import PauseModal from "./PauseModal.jsx";
+import { emailToUsername } from "./staffLogin.js";
 
 const CARGO_ESTADO = {
   paid: { label: "Pagado", icon: CheckCircle2, className: "text-teal-600 dark:text-teal-400" },
@@ -26,6 +32,7 @@ const CARGO_ESTADO = {
     icon: CalendarClock,
     className: "text-slate-400 dark:text-slate-500",
   },
+  paused: { label: "Pausado", icon: Pause, className: "text-sky-500 dark:text-sky-400" },
 };
 
 export default function ClientDetail({
@@ -38,19 +45,34 @@ export default function ClientDetail({
   onToggle,
   onEdit,
   onDeletePayment,
+  onChargeOverride,
+  onShowRecibo,
 }) {
   const [editing, setEditing] = useState(false);
+  const [chargingSpecial, setChargingSpecial] = useState(false);
+  const [pausing, setPausing] = useState(false);
+
+  const activePause = (client.pausePeriods ?? []).find(
+    (p) => new Date(p.from) <= new Date() && new Date() <= new Date(p.to)
+  );
+
+  const { charges, payments: ledgerPayments } = useMemo(
+    () => allocateLedger(client, client.payments),
+    [client]
+  );
 
   const movimientos = useMemo(() => {
-    const { charges, payments } = allocateLedger(client, client.payments);
     const cargos = charges.map((c) => ({
       kind: "cargo",
       date: c.date,
       amount: c.amount,
       status: c.status,
       paidAmount: c.paidAmount,
+      overridden: c.overridden,
+      note: c.note,
+      appliedByEmail: c.appliedByEmail,
     }));
-    const pagos = payments.map((p) => ({
+    const pagos = ledgerPayments.map((p) => ({
       kind: "pago",
       id: p.id,
       date: p.date,
@@ -58,9 +80,10 @@ export default function ClientDetail({
       method: p.method,
       coversMonth: p.coversMonth,
       registeredByEmail: p.registeredByEmail,
+      note: p.note,
     }));
     return [...cargos, ...pagos].sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [client]);
+  }, [charges, ledgerPayments]);
 
   return (
     <div className="fixed inset-0 z-20 flex justify-end bg-black/30" onClick={onClose}>
@@ -93,11 +116,37 @@ export default function ClientDetail({
             </button>
           )}
         </div>
+        {client.contact && (
+          <p className="text-xs text-slate-400 mt-1 dark:text-slate-500">{client.contact}</p>
+        )}
         {client.code && (
           <p className="text-xs text-slate-400 mt-1 dark:text-slate-500">Código {client.code}</p>
         )}
         {client.notes && (
           <p className="text-xs text-slate-500 mt-1 italic dark:text-slate-400">{client.notes}</p>
+        )}
+        {client.openingBalance !== 0 && (
+          <p className="text-xs mt-1 font-medium text-amber-600 dark:text-amber-400">
+            Ajuste de saldo aplicado: {client.openingBalance > 0 ? "+" : ""}
+            {fmtAmount(client.openingBalance, config)}
+          </p>
+        )}
+        {isAdmin && client.lastEditedByEmail && (
+          <p className="text-xs text-slate-400 mt-1 dark:text-slate-500">
+            Última edición: {emailToUsername(client.lastEditedByEmail)} ·{" "}
+            {fmtDateTime(client.lastEditedAt, config)}
+          </p>
+        )}
+        {isAdmin && client.status === "cancelled" && client.statusChangedByEmail && (
+          <p className="text-xs text-slate-400 mt-1 dark:text-slate-500">
+            Retirado por {emailToUsername(client.statusChangedByEmail)} ·{" "}
+            {fmtDateTime(client.statusChangedAt, config)}
+          </p>
+        )}
+        {activePause && (
+          <p className="text-xs mt-1 font-medium text-sky-600 dark:text-sky-400">
+            Servicio pausado hasta {fmtDate(activePause.to, config)}
+          </p>
         )}
 
         <div className="mt-4 rounded-lg bg-stone-100 p-4 dark:bg-slate-900">
@@ -123,21 +172,47 @@ export default function ClientDetail({
           >
             <Wallet size={16} /> Registrar pago
           </button>
-          <button
-            onClick={onToggle}
-            className="flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
-            {client.status === "active" ? (
-              <>
-                <Power size={16} /> Retirar
-              </>
-            ) : (
-              <>
-                <RotateCcw size={16} /> Reactivar
-              </>
-            )}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                if (client.status === "active") {
+                  if (window.confirm(`¿Retirar a ${client.name}? Podés reactivarlo después.`)) {
+                    onToggle();
+                  }
+                } else {
+                  onToggle();
+                }
+              }}
+              className="flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              {client.status === "active" ? (
+                <>
+                  <Power size={16} /> Retirar
+                </>
+              ) : (
+                <>
+                  <RotateCcw size={16} /> Reactivar
+                </>
+              )}
+            </button>
+          )}
         </div>
+        {isAdmin && (
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => setChargingSpecial(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              <Tag size={16} /> Cobro especial
+            </button>
+            <button
+              onClick={() => setPausing(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              <Pause size={16} /> Pausar servicio
+            </button>
+          </div>
+        )}
 
         <h3 className="mt-6 mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
           Historial
@@ -182,11 +257,36 @@ export default function ClientDetail({
                         ? `${fmtAmount(m.paidAmount, config)} de ${fmtAmount(m.amount, config)}`
                         : fmtAmount(m.amount, config)}
                     </span>
+                    {m.kind === "cargo" && m.overridden && (
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        antes <s>{fmtAmount(client.amount, config)}</s>
+                      </p>
+                    )}
                     <p className="text-xs text-slate-400 dark:text-slate-500">
                       {m.kind === "pago" ? fmtDateTime(m.date, config) : fmtDate(m.date, config)}
-                      {m.kind === "pago" && m.registeredByEmail && ` · ${m.registeredByEmail}`}
+                      {m.kind === "pago" &&
+                        m.registeredByEmail &&
+                        ` · ${emailToUsername(m.registeredByEmail)}`}
                     </p>
+                    {m.note && (
+                      <p className="text-xs italic text-slate-400 dark:text-slate-500">
+                        {m.note}
+                        {m.kind === "cargo" &&
+                          isAdmin &&
+                          m.appliedByEmail &&
+                          ` · ${emailToUsername(m.appliedByEmail)}`}
+                      </p>
+                    )}
                   </div>
+                  {m.kind === "pago" && (
+                    <button
+                      onClick={() => onShowRecibo(m)}
+                      aria-label="Compartir recibo"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-teal-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-teal-400"
+                    >
+                      <Share2 size={16} />
+                    </button>
+                  )}
                   {m.kind === "pago" && isAdmin && (
                     <button
                       onClick={() => {
@@ -195,9 +295,9 @@ export default function ClientDetail({
                         }
                       }}
                       aria-label="Eliminar pago"
-                      className="text-slate-400 hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-400"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-500 dark:hover:bg-rose-950 dark:hover:text-rose-400"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   )}
                 </div>
@@ -217,6 +317,28 @@ export default function ClientDetail({
             await onEdit(data);
             setEditing(false);
           }}
+        />
+      )}
+
+      {chargingSpecial && (
+        <ChargeOverrideModal
+          client={client}
+          charges={charges}
+          config={config}
+          onClose={() => setChargingSpecial(false)}
+          onSave={async (overrides) => {
+            await onChargeOverride(overrides);
+            setChargingSpecial(false);
+          }}
+        />
+      )}
+
+      {pausing && (
+        <PauseModal
+          client={client}
+          config={config}
+          onClose={() => setPausing(false)}
+          onSave={onEdit}
         />
       )}
     </div>
