@@ -8,7 +8,7 @@ export default function ThemeToggle() {
     <button
       onClick={toggleTheme}
       aria-label="Cambiar tema"
-      className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+      className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
     >
       {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
     </button>
