@@ -3,8 +3,35 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isOperator() {
-      return request.auth != null;
+    // Roles del equipo: documento staff/{uid} con { role: "admin" | "operator" }.
+    // No hay Cloud Functions/Admin SDK, así que el primer admin se crea a
+    // mano (consola de Firebase o emulador); desde ahí, un admin puede
+    // gestionar al resto desde la app.
+    function isStaff() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/staff/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // Permiso puntual por operador (no por rol): un admin puede desactivarle
+    // a un operador específico la posibilidad de agregar clientes nuevos,
+    // sin tocar el resto de sus permisos de "cobrar". Default true (ausente
+    // = permitido) para no romper operadores ya creados antes de que
+    // existiera este campo.
+    function canAddClients() {
+      return isAdmin() ||
+        (isStaff() &&
+          get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('canAddClients', true) == true);
+    }
+
+    match /staff/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // El ID del documento de cliente es el token aleatorio del enlace.
@@ -12,29 +39,40 @@ service cloud.firestore {
     // nunca puede listar/enumerar la colección.
     match /clients/{clientId} {
       allow get: if true;
-      allow list: if isOperator();
-      allow create, update, delete: if isOperator();
+      allow list: if isStaff();
+      allow create: if canAddClients();
+      // Editar cualquier campo del cliente (incluido status/endedAt —
+      // retirar/reactivar) es solo de admin. El operador únicamente cobra:
+      // crea pagos (ver payments más abajo), no toca el doc del cliente.
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
 
       // Subcolección de pagos: para listarla hace falta conocer el
       // clientId exacto (va en la ruta), igual que para leer el cliente.
       // Así un cliente público nunca puede ver pagos de otro clientId.
       match /payments/{paymentId} {
         allow get, list: if true;
-        allow create, update, delete: if isOperator();
+        allow create, update: if isStaff();
+        // Borrar un pago es una corrección financiera — solo admin, a
+        // diferencia de crear/editar que sigue abierto al operador.
+        allow delete: if isAdmin();
       }
     }
 
     // Planes: catálogo no sensible (nombre/monto/ciclo), legible por
-    // cualquiera para que el panel público pueda resolver el saldo.
+    // cualquiera para que el panel público pueda resolver el saldo. Crear y
+    // editar planes es una acción estructural — solo admin (igual que
+    // editar info de cliente o gestionar roles).
     match /plans/{planId} {
       allow read: if true;
-      allow write: if isOperator();
+      allow write: if isAdmin();
     }
 
-    // Configuración de la vertical: no es dato de negocio sensible.
+    // Configuración de la vertical: no es dato de negocio sensible, pero
+    // renombrar etiquetas/métodos de pago es estructural — solo admin.
     match /config/{configId} {
       allow read: if true;
-      allow write: if isOperator();
+      allow write: if isAdmin();
     }
   }
 }

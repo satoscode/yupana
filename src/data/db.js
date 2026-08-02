@@ -9,10 +9,12 @@ import {
   addDoc,
   updateDoc,
   setDoc,
+  deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,
-  serverTimestamp,
+  limit,
 } from "firebase/firestore";
 import { db } from "../firebase.js";
 
@@ -24,6 +26,7 @@ const plansCol = () => collection(db, "plans");
 // Firestore Rules tengan que "adivinar" si conoce su propio ID.
 const paymentsCol = (clientId) => collection(db, "clients", clientId, "payments");
 const configDoc = () => doc(db, "config", "default");
+const staffCol = () => collection(db, "staff");
 
 function withId(snap) {
   return { id: snap.id, ...snap.data() };
@@ -46,7 +49,7 @@ export async function getClient(idOrToken) {
 
 export async function createClient(data) {
   const ref = doc(clientsCol()); // ID aleatorio largo = token del cliente
-  await setDoc(ref, {
+  const docData = {
     name: data.name,
     contact: data.contact ?? null,
     planId: data.planId,
@@ -58,21 +61,70 @@ export async function createClient(data) {
     code: data.code ?? null,
     notes: data.notes ?? null,
     customFields: data.customFields ?? {},
-    createdAt: serverTimestamp(),
+    createdAt: new Date().toISOString(),
     endedAt: null,
-  });
-  return ref.id;
+  };
+  await setDoc(ref, docData);
+  // Devuelve el doc completo (no solo el id) para que la UI pueda reflejarlo
+  // en memoria sin tener que releerlo de Firestore.
+  return { id: ref.id, ...docData };
 }
 
-export async function updateClient(id, data) {
-  await updateDoc(doc(db, "clients", id), data);
+// author: { uid, email } del staff que hace el cambio — queda registrado
+// para auditoría (ver docs/roadmap.md). Solo guarda el último cambio de
+// cada tipo, no un historial completo.
+export async function updateClient(id, data, author) {
+  const patch = {
+    ...data,
+    lastEditedBy: author.uid,
+    lastEditedByEmail: author.email,
+    lastEditedAt: new Date().toISOString(),
+  };
+  await updateDoc(doc(db, "clients", id), patch);
+  return patch;
 }
 
-export async function setClientStatus(id, status) {
-  await updateDoc(doc(db, "clients", id), {
+export async function setClientStatus(id, status, author) {
+  const patch = {
     status,
-    endedAt: status === "active" ? null : serverTimestamp(),
-  });
+    endedAt: status === "active" ? null : new Date().toISOString(),
+    statusChangedBy: author.uid,
+    statusChangedByEmail: author.email,
+    statusChangedAt: new Date().toISOString(),
+  };
+  await updateDoc(doc(db, "clients", id), patch);
+  // Devuelve el patch aplicado para que la UI actualice el cliente en
+  // memoria sin releerlo.
+  return patch;
+}
+
+// overrides: { "<YYYY-MM-DD>": { amount, note } | null }. null borra el
+// ajuste de esa fecha (deleteField). Actualiza por clave puntual (notación
+// de punto) para no pisar ajustes de otras fechas en la misma escritura.
+// author: { uid, email } — queda registrado en cada ajuste para auditoría.
+export async function setChargeOverrides(clientId, overrides, author) {
+  const updates = {};
+  const applied = {};
+  const appliedAt = new Date().toISOString();
+  for (const [dateKey, value] of Object.entries(overrides)) {
+    if (value === null) {
+      updates[`chargeOverrides.${dateKey}`] = deleteField();
+      applied[dateKey] = null;
+    } else {
+      const entry = {
+        ...value,
+        appliedBy: author.uid,
+        appliedByEmail: author.email,
+        appliedAt,
+      };
+      updates[`chargeOverrides.${dateKey}`] = entry;
+      applied[dateKey] = entry;
+    }
+  }
+  await updateDoc(doc(db, "clients", clientId), updates);
+  // Devuelve los ajustes aplicados (con autoría) para actualizar el cliente
+  // en memoria sin releerlo.
+  return applied;
 }
 
 // ---------- payments ----------
@@ -84,13 +136,37 @@ export async function listPayments(clientId) {
 }
 
 export async function createPayment(data) {
-  const ref = await addDoc(paymentsCol(data.clientId), {
+  const docData = {
     amount: data.amount,
-    date: data.date ?? serverTimestamp(),
+    date: data.date ?? new Date().toISOString(),
     method: data.method,
     note: data.note ?? null,
-  });
-  return ref.id;
+    registeredBy: data.registeredBy ?? null,
+    registeredByEmail: data.registeredByEmail ?? null,
+  };
+  const ref = await addDoc(paymentsCol(data.clientId), docData);
+  // Devuelve el pago completo (no solo el id) para que la UI lo agregue en
+  // memoria sin releer la subcolección de pagos.
+  return { id: ref.id, ...docData };
+}
+
+export async function deletePayment(clientId, paymentId) {
+  await deleteDoc(doc(paymentsCol(clientId), paymentId));
+}
+
+// Corregir un pago ya cargado (typo de monto/método/nota), sin borrar y
+// volver a crear — eso perdería el id/fecha de registro original. Abierto a
+// cualquier staff, igual que crear un pago (ver comentario en
+// firestore.rules); author queda igual para auditoría del último cambio.
+export async function updatePayment(clientId, paymentId, data, author) {
+  const patch = {
+    ...data,
+    lastEditedBy: author.uid,
+    lastEditedByEmail: author.email,
+    lastEditedAt: new Date().toISOString(),
+  };
+  await updateDoc(doc(paymentsCol(clientId), paymentId), patch);
+  return patch;
 }
 
 // ---------- plans ----------
@@ -116,6 +192,20 @@ export async function updatePlan(id, data) {
   await updateDoc(doc(db, "plans", id), data);
 }
 
+// Borrar un plan que ya tiene clientes lo dejaría a esos clientes con un
+// planId huérfano (cobro en 0 silencioso, ver resolvePlanFields). Antes de
+// borrar hay que confirmar que ningún cliente (activo o retirado, ambos
+// necesitan resolver su plan para el historial) lo esté usando.
+export async function planInUse(planId) {
+  const q = query(clientsCol(), where("planId", "==", planId), limit(1));
+  const snap = await getDocs(q);
+  return !snap.empty;
+}
+
+export async function deletePlan(id) {
+  await deleteDoc(doc(db, "plans", id));
+}
+
 // ---------- config ----------
 
 export async function getConfig() {
@@ -125,4 +215,26 @@ export async function getConfig() {
 
 export async function saveConfig(data) {
   await setDoc(configDoc(), data, { merge: true });
+}
+
+// ---------- staff (roles del equipo) ----------
+
+// Devuelve el doc completo (role + permisos puntuales como canAddClients),
+// no solo el role — AuthContext.jsx necesita ambos para el usuario logueado.
+export async function getStaffDoc(uid) {
+  const snap = await getDoc(doc(staffCol(), uid));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function listStaff() {
+  const snap = await getDocs(staffCol());
+  return snap.docs.map(withId);
+}
+
+export async function setStaffRole(uid, { email, role, canAddClients = true }) {
+  await setDoc(doc(staffCol(), uid), { email, role, canAddClients });
+}
+
+export async function removeStaff(uid) {
+  await deleteDoc(doc(staffCol(), uid));
 }

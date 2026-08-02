@@ -1,0 +1,177 @@
+import React, { useEffect, useState } from "react";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { Plus, Trash2, UserCog } from "lucide-react";
+import { Modal } from "./PaymentModal.jsx";
+import { getStaffCreationAuth } from "../firebase.js";
+import { listStaff, setStaffRole, removeStaff } from "../data/db.js";
+import { usernameToEmail, emailToUsername } from "./staffLogin.js";
+
+// Solo admin: crear cuentas nuevas (usuario + contraseña) y asignarles rol,
+// o cambiar/quitar el rol de alguien que ya tiene cuenta. El "usuario" se
+// traduce a un email sintético para Firebase Auth (ver staffLogin.js) — el
+// operador nunca necesita saber ni recordar un email.
+export default function StaffRolesModal({ currentUid, onClose }) {
+  const [staff, setStaff] = useState(null);
+  const [usuario, setUsuario] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("operator");
+  const [canAddClientsNew, setCanAddClientsNew] = useState(true);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const reload = async () => setStaff(await listStaff());
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const addStaff = async () => {
+    if (!usuario.trim() || !password) return;
+    setSaving(true);
+    setError("");
+    try {
+      const email = usernameToEmail(usuario);
+      const secondaryAuth = getStaffCreationAuth();
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      await signOut(secondaryAuth); // limpia la sesión secundaria; no afecta al admin
+      await setStaffRole(cred.user.uid, { email, role, canAddClients: canAddClientsNew });
+      setUsuario("");
+      setPassword("");
+      setRole("operator");
+      setCanAddClientsNew(true);
+      await reload();
+    } catch (err) {
+      setError(
+        err.code === "auth/email-already-in-use"
+          ? "Ese usuario ya existe."
+          : "No se pudo crear la cuenta."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changeRole = async (member, newRole) => {
+    await setStaffRole(member.id, {
+      email: member.email,
+      role: newRole,
+      canAddClients: member.canAddClients ?? true,
+    });
+    await reload();
+  };
+
+  const toggleCanAddClients = async (member, canAddClients) => {
+    await setStaffRole(member.id, { email: member.email, role: member.role, canAddClients });
+    await reload();
+  };
+
+  const remove = async (member) => {
+    await removeStaff(member.id);
+    await reload();
+  };
+
+  return (
+    <Modal onClose={onClose} titulo="Gestionar roles">
+      <div className="mb-4 space-y-2">
+        {staff === null && (
+          <p className="text-sm text-slate-400 dark:text-slate-500">Cargando...</p>
+        )}
+        {staff?.map((member) => (
+          <div
+            key={member.id}
+            className="rounded-lg border border-slate-200 p-2 text-sm dark:border-slate-700"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-slate-800 dark:text-slate-200">
+                  {emailToUsername(member.email) || member.id}
+                </p>
+                <p className="truncate text-xs text-slate-400 dark:text-slate-500">{member.id}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <select
+                  value={member.role}
+                  onChange={(e) => changeRole(member, e.target.value)}
+                  disabled={member.id === currentUid}
+                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="operator">Operador</option>
+                </select>
+                <button
+                  onClick={() => remove(member)}
+                  disabled={member.id === currentUid}
+                  aria-label="Quitar acceso"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 disabled:opacity-30 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+            {member.role === "operator" && (
+              <label className="mt-2 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={member.canAddClients ?? true}
+                  onChange={(e) => toggleCanAddClients(member, e.target.checked)}
+                />
+                Puede agregar clientes
+              </label>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        Crear acceso nuevo
+      </h3>
+      <div className="space-y-2">
+        <input
+          type="text"
+          autoCapitalize="none"
+          autoCorrect="off"
+          value={usuario}
+          onChange={(e) => setUsuario(e.target.value)}
+          placeholder="Usuario (p. ej. marcelo)"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Contraseña"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        />
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        >
+          <option value="admin">Admin</option>
+          <option value="operator">Operador</option>
+        </select>
+        {role === "operator" && (
+          <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+            <input
+              type="checkbox"
+              checked={canAddClientsNew}
+              onChange={(e) => setCanAddClientsNew(e.target.checked)}
+            />
+            Puede agregar clientes
+          </label>
+        )}
+      </div>
+      {error && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+      <button
+        onClick={addStaff}
+        disabled={!usuario.trim() || !password || saving}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40"
+      >
+        <Plus size={16} /> {saving ? "Creando..." : "Crear cuenta"}
+      </button>
+      <p className="mt-3 flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+        <UserCog size={12} /> No puedes cambiar ni quitar tu propio acceso desde aquí.
+      </p>
+    </Modal>
+  );
+}
