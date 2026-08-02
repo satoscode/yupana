@@ -1,10 +1,23 @@
 import React, { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Shuffle } from "lucide-react";
 import { Modal } from "./PaymentModal.jsx";
 import Campo from "./Campo.jsx";
 
+// Sin 0/O ni 1/I/L: caracteres que se confunden fácil al leer o tipear el
+// código a mano (p. ej. en un carnet de socio).
+const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+function randomCode(length = 6) {
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  }
+  return code;
+}
+
 export default function AddClientModal({ config, plans, onClose, onSave }) {
   const [name, setName] = useState("");
+  const [contact, setContact] = useState("");
   const [code, setCode] = useState("");
   const [planId, setPlanId] = useState(plans[0]?.id ?? "");
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
@@ -20,7 +33,7 @@ export default function AddClientModal({ config, plans, onClose, onSave }) {
   const submit = async () => {
     setSaving(true);
     try {
-      await onSave({ name, code, planId, startDate, customFields, notes });
+      await onSave({ name, contact, code, planId, startDate, customFields, notes });
     } finally {
       setSaving(false);
     }
@@ -30,7 +43,30 @@ export default function AddClientModal({ config, plans, onClose, onSave }) {
     <Modal onClose={onClose} titulo={`Agregar ${config.clientTerm.toLowerCase()}`}>
       <div className="space-y-3">
         <Campo label="Nombre" value={name} onChange={setName} />
-        <Campo label="Código" value={code} onChange={setCode} />
+        <Campo label="Contacto (teléfono/WhatsApp)" value={contact} onChange={setContact} />
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
+            Código
+          </label>
+          <div className="flex gap-2">
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <button
+              type="button"
+              onClick={() => setCode(randomCode())}
+              aria-label="Generar código aleatorio"
+              className="flex shrink-0 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
+            >
+              <Shuffle size={16} />
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+            Si no manejás carnet u otro identificador (p. ej. un gimnasio), generá uno aleatorio.
+          </p>
+        </div>
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
             Plan
