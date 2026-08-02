@@ -133,6 +133,21 @@ export function useClientsWithBalance() {
     return updated;
   }, []);
 
+  const updatePayment = useCallback((clientId, paymentId, patch) => {
+    let updated = null;
+    setClients((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== clientId) return entry;
+        const payments = entry.payments.map((p) =>
+          p.id === paymentId ? { ...p, ...patch } : p
+        );
+        updated = computeEntry(entry._raw, entry.plan, payments);
+        return updated;
+      })
+    );
+    return updated;
+  }, []);
+
   return {
     clients,
     loading,
@@ -143,5 +158,6 @@ export function useClientsWithBalance() {
     patchChargeOverrides,
     addPayment,
     removePayment,
+    updatePayment,
   };
 }

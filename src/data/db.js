@@ -154,6 +154,21 @@ export async function deletePayment(clientId, paymentId) {
   await deleteDoc(doc(paymentsCol(clientId), paymentId));
 }
 
+// Corregir un pago ya cargado (typo de monto/método/nota), sin borrar y
+// volver a crear — eso perdería el id/fecha de registro original. Abierto a
+// cualquier staff, igual que crear un pago (ver comentario en
+// firestore.rules); author queda igual para auditoría del último cambio.
+export async function updatePayment(clientId, paymentId, data, author) {
+  const patch = {
+    ...data,
+    lastEditedBy: author.uid,
+    lastEditedByEmail: author.email,
+    lastEditedAt: new Date().toISOString(),
+  };
+  await updateDoc(doc(paymentsCol(clientId), paymentId), patch);
+  return patch;
+}
+
 // ---------- plans ----------
 
 export async function listPlans() {

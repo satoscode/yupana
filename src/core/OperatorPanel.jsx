@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
 import {
+  Download,
   KeyRound,
   MoreVertical,
   Search,
   Settings,
+  Upload,
   UserCog,
   UserPlus,
   Zap,
@@ -18,6 +20,7 @@ import {
   setChargeOverrides,
   setClientStatus,
   updateClient,
+  updatePayment,
 } from "../data/db.js";
 import { fmtAmount } from "./format.js";
 import ClientDetail from "./ClientDetail.jsx";
@@ -27,7 +30,9 @@ import StaffRolesModal from "./StaffRolesModal.jsx";
 import SettingsModal from "./SettingsModal.jsx";
 import ChangePasswordModal from "./ChangePasswordModal.jsx";
 import ReciboModal from "./ReciboModal.jsx";
+import ImportClientsModal from "./ImportClientsModal.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
+import { toCsv, downloadCsv } from "./csv.js";
 
 const FILTROS = [
   ["deben", "Deben"],
@@ -47,6 +52,7 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
     patchChargeOverrides,
     addPayment,
     removePayment,
+    updatePayment: updatePaymentLocal,
   } = useClientsWithBalance();
   const [query, setQuery] = useState("");
   const [filtro, setFiltro] = useState("deben");
@@ -58,6 +64,7 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [reciboFor, setReciboFor] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const totalPorCobrar = clients
     .filter((c) => c.status === "active")
@@ -88,6 +95,11 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
     const created = await createClient(data);
     addClient(created);
     setShowAdd(false);
+  };
+
+  const handleImportClient = async (data) => {
+    const created = await createClient(data);
+    addClient(created);
   };
 
   const handlePayment = async (amount, method, note) => {
@@ -131,8 +143,38 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
     removePayment(sel.id, paymentId);
   };
 
+  const handleEditPayment = async (paymentId, amount, method, note) => {
+    const patch = await updatePayment(sel.id, paymentId, { amount, method, note }, author);
+    updatePaymentLocal(sel.id, paymentId, patch);
+  };
+
   const handleShowRecibo = (payment) => {
     setReciboFor({ client: sel, payment });
+  };
+
+  const handleExportCsv = () => {
+    const headers = [
+      config.clientTerm,
+      "Contacto",
+      "Código",
+      "Plan",
+      "Estado",
+      "Saldo",
+      "Próximo cobro",
+      ...config.customFields.map((f) => f.label),
+    ];
+    const rows = clients.map((c) => [
+      c.name,
+      c.contact ?? "",
+      c.code ?? "",
+      c.plan?.name ?? "",
+      c.status === "active" ? "Activo" : "Retirado",
+      c.balance,
+      c.nextDueDate ? new Date(c.nextDueDate).toISOString().slice(0, 10) : "",
+      ...config.customFields.map((f) => c.customFields?.[f.key] ?? ""),
+    ]);
+    downloadCsv(`clientes-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(headers, rows));
+    setShowMenu(false);
   };
 
   return (
@@ -183,6 +225,19 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
                           setShowMenu(false);
                         }}
                       />
+                    )}
+                    {isAdmin && (
+                      <MenuItem
+                        icon={Upload}
+                        label="Importar clientes (CSV)"
+                        onClick={() => {
+                          setShowImport(true);
+                          setShowMenu(false);
+                        }}
+                      />
+                    )}
+                    {isAdmin && (
+                      <MenuItem icon={Download} label="Exportar clientes (CSV)" onClick={handleExportCsv} />
                     )}
                     <MenuItem
                       icon={KeyRound}
@@ -294,6 +349,7 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
           onToggle={handleToggle}
           onEdit={handleEdit}
           onDeletePayment={handleDeletePayment}
+          onEditPayment={handleEditPayment}
           onChargeOverride={handleChargeOverride}
           onShowRecibo={handleShowRecibo}
         />
@@ -337,6 +393,14 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
       )}
       {showChangePassword && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
+      {showImport && (
+        <ImportClientsModal
+          config={config}
+          plans={plans}
+          onClose={() => setShowImport(false)}
+          onImport={handleImportClient}
+        />
       )}
     </div>
   );

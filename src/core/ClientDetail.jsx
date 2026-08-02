@@ -18,6 +18,7 @@ import { fmtAmount, fmtDate, fmtDateTime, fmtMonth } from "./format.js";
 import EditClientModal from "./EditClientModal.jsx";
 import ChargeOverrideModal from "./ChargeOverrideModal.jsx";
 import PauseModal from "./PauseModal.jsx";
+import PaymentModal from "./PaymentModal.jsx";
 import { emailToUsername } from "./staffLogin.js";
 
 const CARGO_ESTADO = {
@@ -45,12 +46,14 @@ export default function ClientDetail({
   onToggle,
   onEdit,
   onDeletePayment,
+  onEditPayment,
   onChargeOverride,
   onShowRecibo,
 }) {
   const [editing, setEditing] = useState(false);
   const [chargingSpecial, setChargingSpecial] = useState(false);
   const [pausing, setPausing] = useState(false);
+  const [editingPayment, setEditingPayment] = useState(null);
 
   const activePause = (client.pausePeriods ?? []).find(
     (p) => new Date(p.from) <= new Date() && new Date() <= new Date(p.to)
@@ -287,6 +290,15 @@ export default function ClientDetail({
                       <Share2 size={16} />
                     </button>
                   )}
+                  {m.kind === "pago" && (
+                    <button
+                      onClick={() => setEditingPayment(m)}
+                      aria-label="Editar pago"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-teal-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-teal-400"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  )}
                   {m.kind === "pago" && isAdmin && (
                     <button
                       onClick={() => {
@@ -339,6 +351,19 @@ export default function ClientDetail({
           config={config}
           onClose={() => setPausing(false)}
           onSave={onEdit}
+        />
+      )}
+
+      {editingPayment && (
+        <PaymentModal
+          client={client}
+          config={config}
+          payment={editingPayment}
+          onClose={() => setEditingPayment(null)}
+          onSave={async (amount, method, note) => {
+            await onEditPayment(editingPayment.id, amount, method, note);
+            setEditingPayment(null);
+          }}
         />
       )}
     </div>

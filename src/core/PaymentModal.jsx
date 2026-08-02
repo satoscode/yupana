@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 
-export default function PaymentModal({ client, config, onClose, onSave }) {
-  const [amount, setAmount] = useState(Math.max(0, client.balance) || client.amount);
-  const [method, setMethod] = useState(config.paymentMethods[0]);
-  const [note, setNote] = useState("");
+// payment: si viene, edita ese pago existente en vez de registrar uno
+// nuevo — mismo formulario, precargado con sus valores actuales.
+export default function PaymentModal({ client, config, payment, onClose, onSave }) {
+  const [amount, setAmount] = useState(
+    payment ? payment.amount : Math.max(0, client.balance) || client.amount
+  );
+  const [method, setMethod] = useState(payment?.method ?? config.paymentMethods[0]);
+  const [note, setNote] = useState(payment?.note ?? "");
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
@@ -17,7 +21,7 @@ export default function PaymentModal({ client, config, onClose, onSave }) {
   };
 
   return (
-    <Modal onClose={onClose} titulo="Registrar pago">
+    <Modal onClose={onClose} titulo={payment ? "Editar pago" : "Registrar pago"}>
       <p className="text-sm text-slate-500 mb-3 dark:text-slate-400">{client.name}</p>
       <label className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
         Monto ({config.currency})
@@ -61,7 +65,7 @@ export default function PaymentModal({ client, config, onClose, onSave }) {
         disabled={saving || !amount}
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
       >
-        <Check size={16} /> {saving ? "Guardando..." : "Guardar pago"}
+        <Check size={16} /> {saving ? "Guardando..." : payment ? "Guardar cambios" : "Guardar pago"}
       </button>
     </Modal>
   );
