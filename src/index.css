@@ -1,3 +1,28 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* html/body no tienen fondo propio por defecto (queda blanco del navegador);
+   en el celular, el rebote elástico del scroll (o el "sobre-scroll" cuando el
+   contenido entra justo en la pantalla) deja ver ese blanco por un instante,
+   sobre todo en modo oscuro. overscroll-behavior evita el rebote, y el fondo
+   coincide con el de las pantallas (bg-stone-100/dark:bg-slate-900) para que,
+   si igual se ve un borde, sea del color correcto. No se puede usar la
+   variante dark: de Tailwind acá porque .dark se agrega al propio <html>, no
+   a un ancestro suyo (el selector generado nunca matchea el mismo elemento). */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+html {
+  background-color: #f5f5f4; /* stone-100 */
+}
+
+html.dark {
+  background-color: #0f172a; /* slate-900 */
+}
+
+body {
+  background-color: inherit;
+}

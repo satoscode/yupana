@@ -53,7 +53,7 @@ function Authenticated() {
 
 function FullScreenMessage({ text, children }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-1 bg-stone-100 px-6 text-center text-sm text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-1 bg-stone-100 px-6 text-center text-sm text-slate-500 dark:bg-slate-900 dark:text-slate-400">
       <p>{text}</p>
       {children}
     </div>

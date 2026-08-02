@@ -43,7 +43,7 @@ export default function ClientLookup() {
   }, [token]);
 
   return (
-    <div className="min-h-screen bg-stone-100 px-4 py-8 dark:bg-slate-900">
+    <div className="min-h-dvh bg-stone-100 px-4 py-8 dark:bg-slate-900">
       <div className="mx-auto max-w-sm">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-slate-100">
