@@ -1,15 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 
 export default function PaymentModal({ client, config, onClose, onSave }) {
   const [amount, setAmount] = useState(Math.max(0, client.balance) || client.amount);
   const [method, setMethod] = useState(config.paymentMethods[0]);
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
     setSaving(true);
     try {
-      await onSave(Number(amount), method);
+      await onSave(Number(amount), method, note.trim() || null);
     } finally {
       setSaving(false);
     }
@@ -45,6 +46,16 @@ export default function PaymentModal({ client, config, onClose, onSave }) {
           </button>
         ))}
       </div>
+      <label className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
+        Nota (opcional)
+      </label>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={2}
+        placeholder="Ej: pago con descuento excepcional autorizado"
+        className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+      />
       <button
         onClick={submit}
         disabled={saving || !amount}
@@ -56,17 +67,42 @@ export default function PaymentModal({ client, config, onClose, onSave }) {
   );
 }
 
+// `vh`/`dvh` no se enteran cuando aparece el teclado del celular (sobre todo
+// en Android): el navegador achica el área visible real sin que el CSS lo
+// sepa, así que un input enfocado puede dejar el botón de guardar tapado
+// por el teclado sin nada que scrollear para alcanzarlo. visualViewport sí
+// conoce el alto realmente visible en cada momento.
+function useVisualViewportHeight() {
+  const [height, setHeight] = useState(() => window.visualViewport?.height ?? null);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setHeight(vv.height);
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  return height;
+}
+
 export function Modal({ titulo, children, onClose }) {
+  const vvHeight = useVisualViewportHeight();
   return (
     <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-x-0 top-0 z-30 flex h-dvh items-center justify-center overflow-y-auto bg-black/40 p-4"
+      style={vvHeight ? { height: `${Math.round(vvHeight)}px` } : undefined}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl dark:bg-slate-800"
+        className="flex max-h-full w-full max-w-sm flex-col rounded-xl bg-white shadow-xl dark:bg-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-4">
           <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{titulo}</h3>
           <button
             onClick={onClose}
@@ -75,7 +111,10 @@ export function Modal({ titulo, children, onClose }) {
             ✕
           </button>
         </div>
-        {children}
+        {/* Solo el cuerpo scrollea; el header queda fijo arriba para poder
+            cerrar el modal aunque el contenido sea más alto que la pantalla
+            (p. ej. Configuración en un celular). */}
+        <div className="overflow-y-auto px-5 pb-5">{children}</div>
       </div>
     </div>
   );
