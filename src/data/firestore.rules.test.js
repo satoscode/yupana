@@ -103,9 +103,9 @@ describe("firestore.rules — operador", () => {
     await assertSucceeds(setDoc(doc(db, "clients", "nuevoToken"), { name: "Nuevo" }));
   });
 
-  it("puede retirar/reactivar (status + endedAt)", async () => {
+  it("NO puede retirar/reactivar (status + endedAt) — eso es admin-only", async () => {
     const db = testEnv.authenticatedContext(OPERATOR_UID).firestore();
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(db, "clients", CLIENT_A), { status: "cancelled", endedAt: "2026-01-01" })
     );
   });
@@ -149,6 +149,13 @@ describe("firestore.rules — admin", () => {
   it("puede editar la info base de un cliente", async () => {
     const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
     await assertSucceeds(updateDoc(doc(db, "clients", CLIENT_A), { name: "Otro nombre" }));
+  });
+
+  it("puede retirar/reactivar (status + endedAt)", async () => {
+    const db = testEnv.authenticatedContext(ADMIN_UID).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, "clients", CLIENT_A), { status: "cancelled", endedAt: "2026-01-01" })
+    );
   });
 
   it("puede borrar clientes", async () => {

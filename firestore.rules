@@ -30,13 +30,10 @@ service cloud.firestore {
       allow get: if true;
       allow list: if isStaff();
       allow create: if isStaff();
-      // Editar la info base del cliente (nombre, plan, fecha de alta,
-      // campos extra, saldo) es solo de admin. El operador solo puede
-      // tocar status/endedAt (retirar/reactivar) — nunca el resto.
-      allow update: if isAdmin() ||
-        (isStaff() &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["status", "endedAt"]));
+      // Editar cualquier campo del cliente (incluido status/endedAt —
+      // retirar/reactivar) es solo de admin. El operador únicamente cobra:
+      // crea pagos (ver payments más abajo), no toca el doc del cliente.
+      allow update: if isAdmin();
       allow delete: if isAdmin();
 
       // Subcolección de pagos: para listarla hace falta conocer el
