@@ -19,9 +19,15 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+// Se usa el hostname con el que el navegador cargó la página (no un
+// 127.0.0.1 fijo) para que también funcione al acceder desde otro
+// dispositivo en la red local (ej. celular) apuntando a la IP LAN del
+// equipo de desarrollo.
+const emulatorHost = window.location.hostname;
+
 if (useEmulator) {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  connectAuthEmulator(auth, `http://${emulatorHost}:9099`, { disableWarnings: true });
+  connectFirestoreEmulator(db, emulatorHost, 8080);
 }
 
 // Instancia de Auth aislada (app secundaria) solo para crear cuentas nuevas
@@ -36,7 +42,7 @@ export function getStaffCreationAuth() {
     const secondaryApp = initializeApp(firebaseConfig, "staff-creation");
     staffCreationAuth = getAuth(secondaryApp);
     if (useEmulator) {
-      connectAuthEmulator(staffCreationAuth, "http://127.0.0.1:9099", { disableWarnings: true });
+      connectAuthEmulator(staffCreationAuth, `http://${emulatorHost}:9099`, { disableWarnings: true });
     }
   }
   return staffCreationAuth;
