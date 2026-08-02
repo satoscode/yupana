@@ -1,11 +1,21 @@
 import React, { useMemo, useState } from "react";
-import { KeyRound, Search, Settings, UserCog, UserPlus, Zap, LogOut } from "lucide-react";
+import {
+  KeyRound,
+  MoreVertical,
+  Search,
+  Settings,
+  UserCog,
+  UserPlus,
+  Zap,
+  LogOut,
+} from "lucide-react";
 import { useAuth } from "./AuthContext.jsx";
 import { useClientsWithBalance } from "./useClientsWithBalance.js";
 import {
   createClient,
   createPayment,
   deletePayment,
+  setChargeOverrides,
   setClientStatus,
   updateClient,
 } from "../data/db.js";
@@ -16,6 +26,7 @@ import AddClientModal from "./AddClientModal.jsx";
 import StaffRolesModal from "./StaffRolesModal.jsx";
 import SettingsModal from "./SettingsModal.jsx";
 import ChangePasswordModal from "./ChangePasswordModal.jsx";
+import ReciboModal from "./ReciboModal.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 
 const FILTROS = [
@@ -27,7 +38,16 @@ const FILTROS = [
 
 export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, onReloadConfig }) {
   const { user, signOut } = useAuth();
-  const { clients, loading, reload } = useClientsWithBalance();
+  const {
+    clients,
+    loading,
+    reload,
+    addClient,
+    patchClient,
+    patchChargeOverrides,
+    addPayment,
+    removePayment,
+  } = useClientsWithBalance();
   const [query, setQuery] = useState("");
   const [filtro, setFiltro] = useState("deben");
   const [selId, setSelId] = useState(null);
@@ -36,6 +56,8 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
   const [showRoles, setShowRoles] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [reciboFor, setReciboFor] = useState(null);
+  const [showMenu, setShowMenu] = useState(false);
 
   const totalPorCobrar = clients
     .filter((c) => c.status === "active")
@@ -52,7 +74,7 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
         return true;
       })
       .filter((c) => {
-        const haystack = [c.name, c.code, ...Object.values(c.customFields ?? {})]
+        const haystack = [c.name, c.contact, c.code, ...Object.values(c.customFields ?? {})]
           .join(" ")
           .toLowerCase();
         return haystack.includes(query.toLowerCase());
@@ -63,40 +85,58 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
   const sel = clients.find((c) => c.id === selId) ?? null;
 
   const handleAddClient = async (data) => {
-    await createClient(data);
+    const created = await createClient(data);
+    addClient(created);
     setShowAdd(false);
-    await reload();
   };
 
-  const handlePayment = async (amount, method) => {
-    await createPayment({
-      clientId: pagoFor.id,
+  const handlePayment = async (amount, method, note) => {
+    const client = pagoFor;
+    const payment = await createPayment({
+      clientId: client.id,
       amount,
       method,
+      note,
       registeredBy: user.uid,
       registeredByEmail: user.email,
     });
+    const updatedClient = addPayment(client.id, payment) ?? client;
     setPagoFor(null);
-    await reload();
+    setReciboFor({ client: updatedClient, payment });
   };
 
+  const author = { uid: user.uid, email: user.email };
+
   const handleToggle = async () => {
-    await setClientStatus(sel.id, sel.status === "active" ? "cancelled" : "active");
-    await reload();
+    const patch = await setClientStatus(
+      sel.id,
+      sel.status === "active" ? "cancelled" : "active",
+      author
+    );
+    patchClient(sel.id, patch);
   };
 
   const handleEdit = async (data) => {
-    await updateClient(sel.id, data);
-    await reload();
+    const patch = await updateClient(sel.id, data, author);
+    patchClient(sel.id, patch);
+  };
+
+  const handleChargeOverride = async (overrides) => {
+    const applied = await setChargeOverrides(sel.id, overrides, author);
+    patchChargeOverrides(sel.id, applied);
   };
 
   const handleDeletePayment = async (paymentId) => {
     await deletePayment(sel.id, paymentId);
-    await reload();
+    removePayment(sel.id, paymentId);
+  };
+
+  const handleShowRecibo = (payment) => {
+    setReciboFor({ client: sel, payment });
   };
 
   return (
-    <div className="min-h-screen bg-stone-100 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+    <div className="min-h-dvh bg-stone-100 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-3xl px-4 py-6">
         <header className="mb-5 flex items-center justify-between">
           <div>
@@ -108,46 +148,62 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
             </h1>
             <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">Control de clientes y cobros</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <ThemeToggle />
-            {isAdmin && (
+            <div className="relative">
               <button
-                onClick={() => setShowSettings(true)}
-                aria-label="Configuración"
-                className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+                onClick={() => setShowMenu((v) => !v)}
+                aria-label="Más opciones"
+                aria-expanded={showMenu}
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               >
-                <Settings size={16} />
+                <MoreVertical size={18} />
               </button>
-            )}
-            {isAdmin && (
-              <button
-                onClick={() => setShowRoles(true)}
-                aria-label="Gestionar roles"
-                className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-              >
-                <UserCog size={16} />
-              </button>
-            )}
-            <button
-              onClick={() => setShowChangePassword(true)}
-              aria-label="Cambiar contraseña"
-              className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-            >
-              <KeyRound size={16} />
-            </button>
-            <button
-              onClick={signOut}
-              className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-            >
-              <LogOut size={16} /> Salir
-            </button>
+              {showMenu && (
+                <>
+                  {/* Overlay para cerrar el menú al tocar afuera, mismo patrón que los modales. */}
+                  <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                    {isAdmin && (
+                      <MenuItem
+                        icon={Settings}
+                        label="Configuración"
+                        onClick={() => {
+                          setShowSettings(true);
+                          setShowMenu(false);
+                        }}
+                      />
+                    )}
+                    {isAdmin && (
+                      <MenuItem
+                        icon={UserCog}
+                        label="Gestionar roles"
+                        onClick={() => {
+                          setShowRoles(true);
+                          setShowMenu(false);
+                        }}
+                      />
+                    )}
+                    <MenuItem
+                      icon={KeyRound}
+                      label="Cambiar contraseña"
+                      onClick={() => {
+                        setShowChangePassword(true);
+                        setShowMenu(false);
+                      }}
+                    />
+                    <MenuItem icon={LogOut} label="Salir" onClick={signOut} danger />
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
         <div className="grid grid-cols-3 gap-3 mb-5">
           <Stat etiqueta="Por cobrar" valor={fmtAmount(totalPorCobrar, config)} acento="text-rose-600 dark:text-rose-400" />
-          <Stat etiqueta={`${config.clientTerm}s que deben`} valor={nDeben} acento="text-amber-600 dark:text-amber-400" />
-          <Stat etiqueta={`${config.clientTerm}s activos`} valor={nActivos} acento="text-teal-700 dark:text-teal-400" />
+          <Stat etiqueta="Deben" valor={nDeben} acento="text-amber-600 dark:text-amber-400" />
+          <Stat etiqueta="Activos" valor={nActivos} acento="text-teal-700 dark:text-teal-400" />
         </div>
 
         <div className="flex gap-2 mb-3">
@@ -236,6 +292,8 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
           onToggle={handleToggle}
           onEdit={handleEdit}
           onDeletePayment={handleDeletePayment}
+          onChargeOverride={handleChargeOverride}
+          onShowRecibo={handleShowRecibo}
         />
       )}
       {pagoFor && (
@@ -244,6 +302,14 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
           config={config}
           onClose={() => setPagoFor(null)}
           onSave={handlePayment}
+        />
+      )}
+      {reciboFor && (
+        <ReciboModal
+          client={reciboFor.client}
+          payment={reciboFor.payment}
+          config={config}
+          onClose={() => setReciboFor(null)}
         />
       )}
       {showAdd && (
@@ -271,6 +337,21 @@ export default function OperatorPanel({ config, plans, isAdmin, onReloadPlans, o
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}
     </div>
+  );
+}
+
+function MenuItem({ icon: Icon, label, onClick, danger }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm ${
+        danger
+          ? "text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950"
+          : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+      }`}
+    >
+      <Icon size={16} /> {label}
+    </button>
   );
 }
 
